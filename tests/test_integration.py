@@ -183,14 +183,16 @@ class IntegrationTests(unittest.TestCase):
                 jobs_dir=root / "jobs",
                 draft=DraftConfig(draft_root=str(draft_root)),
             )
-            with patch("autocut_agent.mac_install.jianying_running", return_value=False):
+            with patch("autocut_agent.platform_adapter.sys.platform", "darwin"), \
+                 patch("autocut_agent.mac_install.jianying_running", return_value=False):
                 result = create_smoke(config)
             installed = Path(result["draft"])
             self.assertTrue((installed / "draft_info.json").is_file())
             self.assertGreaterEqual(len(list((installed / "Resources").iterdir())), 2)
             registry = json.loads((draft_root / "root_meta_info.json").read_text(encoding="utf-8"))
             self.assertEqual(registry["all_draft_store"][0]["draft_name"], SMOKE_NAME)
-            with patch("autocut_agent.mac_install.jianying_running", return_value=False):
+            with patch("autocut_agent.platform_adapter.sys.platform", "darwin"), \
+                 patch("autocut_agent.mac_install.jianying_running", return_value=False):
                 restore_smoke(config)
             registry = json.loads((draft_root / "root_meta_info.json").read_text(encoding="utf-8"))
             self.assertEqual(registry["all_draft_store"], [])
