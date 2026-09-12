@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 import wave
@@ -168,6 +169,7 @@ class IntegrationTests(unittest.TestCase):
                     )
                 self.assertEqual(result["validation"], {"video_tracks": 1, "audio_tracks": 1, "text_tracks": 1})
 
+    @unittest.skipUnless(sys.platform == "darwin", "macOS 草稿安装冒烟只在 macOS 环境运行")
     def test_smoke_installer_bundles_and_unregisters_in_temp_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
