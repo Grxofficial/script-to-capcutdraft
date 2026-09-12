@@ -1,0 +1,59 @@
+[project]
+state_dir = ".autocut"
+jobs_dir = "jobs"
+
+[canvas]
+width = 1080
+height = 1920
+fps = 30
+
+[media]
+scene_backend = "auto"
+transnet_weights = ".autocut/models/transnetv2-pytorch-weights.pth"
+transnet_device = "cpu"
+scene_threshold = 0.40
+min_shot_seconds = 1.0
+max_shot_seconds = 30.0
+keyframes_per_clip = 3
+
+[ai]
+base_url = "https://ark.cn-beijing.volces.com/api/plan/v3"
+api_mode = "responses"
+vlm_model = "glm-5.3-flash"
+embedding_model = "doubao-embedding-vision"
+embedding_batch_size = 10
+rerank_model = "doubao-seed-2-0-lite"
+rerank_api_mode = "chat_completions"
+timeout_seconds = 120
+analyzer_version = "v1"
+
+# 豆包语音合成 2.0，走火山方舟 Agent Plan 专属接口。
+[doubao_tts]
+base_url = "https://openspeech.bytedance.com/api/v3/plan/tts/unidirectional"
+resource_id = "seed-tts-2.0"
+speaker = "zh_female_xiaohe_uranus_bigtts"
+sample_rate = 24000
+audio_format = "mp3"
+retries = 3
+tighten_audio = true
+silence_threshold_db = -45.0
+keep_silence_seconds = 0.04
+
+[matching]
+confidence_threshold = 0.55
+candidate_count = 12
+min_segment_seconds = 1.5
+max_segment_seconds = 4.5
+same_source_penalty = 0.12
+reuse_penalty = 0.30
+text_pollution_penalty = 0.12
+head_trim_frames = 10
+
+[draft]
+name_prefix = "AI混剪-"
+auto_install = true
+require_smoke_approval = true
+# auto 会分别定位 macOS/Windows 剪映草稿目录；非标准安装可写绝对路径
+draft_root = "auto"
+text_size = 6.0
+text_y = -0.78

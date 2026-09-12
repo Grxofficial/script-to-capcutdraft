@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autocut Studio · 创作工作台</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --line: #e3e5e8;
+    --ink: #1f2329; --sub: #6b7280; --brand: #e0354b; --brand-dark: #c22740;
+    --ok: #16a34a; --warn: #d97706; --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 28px 20px 60px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; margin: 0; flex: 1; }
+  header h1 small { color: var(--sub); font-weight: normal; font-size: 13px; margin-left: 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: var(--sub); margin: 14px 0 6px; }
+  label:first-child { margin-top: 0; }
+  textarea, input[type=text], select {
+    width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    font: inherit; background: #fff; color: var(--ink);
+  }
+  textarea { min-height: 150px; resize: vertical; font-size: 14px; }
+  textarea:focus, input:focus, select:focus { outline: 2px solid rgba(224,53,75,.25); border-color: var(--brand); }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+  .modes { display: flex; gap: 10px; }
+  .mode {
+    flex: 1; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px;
+    cursor: pointer; transition: all .15s;
+  }
+  .mode .t { font-weight: 600; }
+  .mode .d { font-size: 12px; color: var(--sub); }
+  .mode.on { border-color: var(--brand); background: rgba(224,53,75,.04); }
+  .mode.on .t { color: var(--brand); }
+  button {
+    border: 0; border-radius: 10px; padding: 10px 18px; font: inherit; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+  }
+  .btn-primary { background: var(--brand); color: #fff; }
+  .btn-primary:hover { background: var(--brand-dark); }
+  .btn-primary:disabled { background: #d5d7db; cursor: not-allowed; }
+  .btn-ghost { background: #eef0f2; color: var(--ink); }
+  .btn-ghost:hover { background: #e2e5e8; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
+    border-radius: 999px; font-size: 13px; font-weight: 600;
+  }
+  .chip.run { background: #fef3c7; color: var(--warn); }
+  .chip.stop { background: #dcfce7; color: var(--ok); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+  .hint { font-size: 12px; color: var(--sub); }
+  .log {
+    background: #111418; color: #d7dae0; border-radius: 10px; padding: 14px;
+    font: 12.5px/1.7 var(--mono); max-height: 260px; overflow-y: auto; margin-top: 12px;
+    white-space: pre-wrap; display: none;
+  }
+  .job-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .job-head b { flex: 1; }
+  .result { margin-top: 12px; padding: 12px 14px; border-radius: 10px; font-size: 14px; display: none; }
+  .result.ok { background: #f0fdf4; border: 1px solid #bbf7d0; display: block; }
+  .result.bad { background: #fef2f2; border: 1px solid #fecaca; display: block; }
+  .result .path { font: 12.5px var(--mono); color: var(--sub); word-break: break-all; }
+  .history-item { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14px; display: flex; gap: 10px; align-items: center; }
+  .history-item:last-child { border-bottom: 0; }
+  .history-item .name { flex: 1; }
+  .tag { font-size: 12px; padding: 2px 10px; border-radius: 999px; font-weight: 600; }
+  .tag.done { background: #dcfce7; color: var(--ok); }
+  .tag.failed { background: #fee2e2; color: #dc2626; }
+  .tag.running { background: #fef3c7; color: var(--warn); }
+  .spinner { width: 14px; height: 14px; border: 2px solid #d5d7db; border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; display: inline-block; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .modal-mask {
+    position: fixed; inset: 0; background: rgba(15,17,21,.45);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal {
+    background: #fff; border-radius: 14px; width: min(560px, 92vw);
+    max-height: 80vh; display: flex; flex-direction: column; padding: 18px;
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .modal-head button { padding: 6px 14px; }
+  .modal-path { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .modal-path button { padding: 6px 12px; }
+  .path-label {
+    font: 13px var(--mono); background: #f4f5f7; border-radius: 8px;
+    padding: 7px 10px; flex: 1; word-break: break-all;
+  }
+  .quick-links { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .quick-links button { padding: 5px 12px; font-size: 13px; }
+  .folder-list {
+    border: 1px solid var(--line); border-radius: 10px; overflow-y: auto;
+    min-height: 180px; max-height: 320px; margin-bottom: 12px;
+  }
+  .folder-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+    cursor: pointer; border-bottom: 1px solid var(--line); font-size: 14px;
+  }
+  .folder-item:last-child { border-bottom: 0; }
+  .folder-item:hover { background: rgba(224,53,75,.05); }
+  .folder-item.sel { background: rgba(224,53,75,.1); font-weight: 600; }
+  .folder-item .ico { color: var(--warn); }
+  .folder-empty { padding: 20px; text-align: center; color: var(--sub); font-size: 13px; }
+  .modal-foot { text-align: right; }
+  /* 工作台视觉层：系统字体、柔和层次、即时按压反馈。 */
+  :root { --bg:#f5f5f7; --ink:#202126; --sub:#777982; --line:#e8e8ed; --brand:#6554d9; --brand-dark:#5141bf; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC",sans-serif; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1180px; padding:28px 42px 52px; }
+  header { margin-bottom:44px; gap:12px; }
+  header h1 { display:flex; align-items:center; gap:11px; font-size:19px; letter-spacing:-.5px; }
+  .appmark { width:34px;height:34px;background:#25252c;color:white;border-radius:11px;display:grid;place-items:center;font-size:19px;box-shadow:0 3px 7px #0002; }
+  .studio { color:var(--sub);font-weight:400; }
+  .intro { display:flex;justify-content:space-between;align-items:end;margin-bottom:28px;gap:24px; }
+  .eyebrow { font-size:11px;letter-spacing:2px;color:#8c899c;font-weight:650;margin:0 0 10px; }
+  .intro h2 { font-size:34px;line-height:1.2;letter-spacing:-1.1px;margin:0 0 12px;font-weight:650; }
+  .intro p { color:var(--sub);margin:0;font-size:14px; }
+  .local-badge { font-size:12px;color:#686775;white-space:nowrap;padding-bottom:4px; }
+  .workspace { display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start; }
+  .card { border:1px solid #e5e5eb;border-radius:22px;padding:26px;box-shadow:0 4px 20px #24243804;margin:0; }
+  .section-title { display:flex;align-items:center;justify-content:space-between;margin-bottom:20px; }
+  .section-title h3 { font-size:16px;font-weight:650;margin:0;letter-spacing:-.3px; }
+  .step { color:#97949f;font-size:11px;letter-spacing:1px; }
+  label { color:#595b65;font-size:12px;font-weight:550;margin:21px 0 8px; }
+  textarea,input[type=text],select { border-color:#e4e4eb;background:#fafafb;border-radius:11px;padding:12px 14px;font-size:13px; }
+  textarea { min-height:235px;line-height:1.9;resize:vertical;background:#fff;border:0;padding:0; }
+  textarea::placeholder { color:#aaaab4; }
+  textarea:focus { outline:none; }
+  .script-area { border:1px solid var(--line);border-radius:14px;padding:18px 18px 10px; }
+  .script-area:focus-within { border-color:#9a8eed;box-shadow:0 0 0 3px #6554d90b; }
+  .editor-foot { display:flex;justify-content:space-between;border-top:1px solid #f0f0f4;padding-top:9px;font-size:11px;color:#9a9aa5; }
+  .modes { gap:10px; }
+  .mode { text-align:left;background:#fff;position:relative;padding:15px;border:1px solid var(--line);font-weight:400; }
+  .mode .t { font-size:13px;display:block;margin-bottom:5px; }
+  .mode .d { font-size:11px;line-height:1.65;display:block; }
+  .mode.on { border-color:#8c7ce5;background:#f8f6ff;box-shadow:0 0 0 1px #8c7ce512; }
+  .mode.on::after { content:'✓';position:absolute;right:12px;top:12px;color:var(--brand);font-size:11px; }
+  button { transition:background 150ms,color 150ms,transform 120ms;touch-action:manipulation; }
+  button:active { transform:scale(.97); }
+  button:focus-visible { outline:3px solid #aea3f1;outline-offset:3px; }
+  .btn-primary { box-shadow:0 3px 7px #6554d91b;font-size:13px; }
+  .btn-ghost { background:#ececf1;font-size:12px;padding:8px 12px; }
+  header .btn-ghost { background:transparent;color:var(--sub); }
+  .chip { font-size:11px;padding:6px 10px;font-weight:500; }
+  .chip.stop { background:#eaf2ee;color:#537e63; }
+  .dot { width:6px;height:6px; }
+  .actions { border-top:1px solid var(--line);padding-top:21px;margin-top:24px;justify-content:space-between; }
+  .actions .hint { max-width:225px;font-size:11px; }
+  #goBtn { min-width:145px;padding:12px 18px; }
+  .sidebar { display:grid;gap:18px; }
+  .preview-card { background:linear-gradient(145deg,#ece9f5,#e8eaf2);padding:25px;border-radius:22px;position:relative;overflow:hidden; }
+  .preview-title { font-size:12px;color:#78738e;display:flex;justify-content:space-between; }
+  .frame { width:144px;height:256px;margin:24px auto; border-radius:12px;background:#fff;box-shadow:0 16px 35px #55516c1c;position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;overflow:hidden; }
+  .frame-symbol { color:#d5d0e3;font-size:36px;font-weight:200; }
+  .frame-label { font-size:9px;color:#aaa5b8;margin-top:8px; }
+  .frame-subtitle { position:absolute;bottom:48px;font-size:10px;max-width:126px;text-align:center;color:#5f5c6a; }
+  .preview-note { font-size:11px;text-align:center;color:#938da5; }
+  .specs { display:flex;justify-content:center;gap:7px;margin-top:17px; }
+  .specs span { background:#ffffff65;border:1px solid #ffffff70;border-radius:6px;padding:3px 7px;font-size:10px;color:#777184; }
+  .history-card { padding:22px; }
+  .history-card .section-title { margin-bottom:14px; }
+  .history-item { font-size:12px;flex-wrap:wrap;padding:13px 0; }
+  .history-item .name { min-width:110px;overflow-wrap:anywhere; }
+  .tag { font-size:10px;padding:3px 8px; }
+  .empty-state { padding:18px 0 8px;text-align:center;color:#9b99a5;font-size:12px; }
+  .empty-icon { font-size:25px;display:block;color:#c0bdcb;margin-bottom:7px; }
+  .footer { display:flex;justify-content:space-between;margin-top:25px;font-size:11px;color:#a09da9; }
+  .modal-mask { background:#20202c38;backdrop-filter:blur(7px); }
+  .modal { background:#fffffff5;border:1px solid #fff9;border-radius:22px;padding:23px;box-shadow:0 25px 100px #16132930; }
+  .folder-item { width:100%;text-align:left;background:transparent;border-radius:0;font-weight:400; }
+  .log { background:#f5f5f9;color:#656271;font-size:11px; }
+  @media(max-width:850px) { .wrap{padding:22px;} .workspace{grid-template-columns:1fr;} .sidebar{grid-template-columns:1fr 1fr;} .intro h2{font-size:29px;} header{margin-bottom:30px;} }
+  @media(max-width:520px) { .sidebar{grid-template-columns:1fr;} .row{flex-direction:column;gap:0;} .intro{display:block;} .local-badge{display:none;} .card{padding:20px;} .wrap{padding:18px 14px;} header h1{flex-basis:100%;} .footer{gap:12px;} }
+  @media(prefers-reduced-motion:reduce) { *,*::before,*::after{animation:none!important;transition:none!important;} }
+  @media(prefers-reduced-transparency:reduce) { .modal{background:#fff;} .modal-mask{backdrop-filter:none;} }
+  @media(prefers-contrast:more) { :root{--sub:#50515b;--line:#999;} .hint,.editor-foot,.footer{color:#555;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1><span class="appmark" aria-hidden="true">⌘</span>script to draft <span class="studio">studio</span></h1>
+    <span id="jyChip" class="chip stop"><span class="dot"></span><span id="jyText">剪映状态检测中…</span></span>
+    <button class="btn-ghost" id="quitBtn" onclick="quitJianying()">退出剪映</button>
+  </header>
+
+  <section class="intro"><div><div class="eyebrow">YOUR EVERYDAY CREATIVE SPACE</div><h2>让文案，成为画面。</h2><p>写下你的文案，旁白、字幕与镜头交给本地工作流。</p></div><span class="local-badge">◉ 本地工作空间</span></section>
+  <div class="workspace">
+  <main class="card">
+    <div class="section-title"><h3>创建新作品</h3><span class="step">01 / 创作</span></div>
+    <label for="text">口播文案</label>
+    <div class="script-area"><textarea id="text" placeholder="在这里，开始你的下一条作品。&#10;&#10;粘贴完整文案，系统会自动按语义拆句。"></textarea><div class="editor-foot"><span>保留原文用字 · 智能拆句</span><span id="charCount">0 字</span></div></div>
+
+    <div class="row">
+      <div>
+        <label for="name">作品名称</label>
+        <input type="text" id="name" placeholder="例如：海边散步-白底">
+      </div>
+      <div>
+        <label for="voice">旁白音色</label>
+        <select id="voice"></select>
+      </div>
+    </div>
+
+    <label>生成模式</label>
+    <div class="modes">
+      <button type="button" class="mode on" id="modeWhite" onclick="setMode('white')" aria-pressed="true"><span class="t">▧ 白底口播</span><span class="d">干净的白底，专注声音与文字</span></button>
+      <button type="button" class="mode" id="modeMatch" onclick="setMode('match')" aria-pressed="false"><span class="t">▥ 素材混剪</span><span class="d">从你的素材库，为每句话找到画面</span></button>
+    </div>
+
+    <div id="libraryRow" style="display:none">
+      <label for="library">素材库路径</label>
+      <div style="display:flex; gap:8px">
+        <input type="text" id="library" placeholder="选择本地素材库文件夹" style="flex:1">
+        <button class="btn-ghost" type="button" onclick="openBrowser()">浏览…</button>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" id="goBtn" onclick="startJob()">生成并安装 ↗</button>
+      <span class="hint" id="hint">生成后自动安装到剪映；安装前会要求剪映已退出</span>
+    </div>
+
+    <div class="log" id="log"></div>
+    <div class="result" id="result" role="status" aria-live="polite"></div>
+  </main>
+
+  <aside class="sidebar"><div class="preview-card"><div class="preview-title"><span>画布概览</span><span>9:16</span></div><div class="frame"><span class="frame-symbol" id="frameSymbol">Aa</span><span class="frame-label" id="frameLabel">白底口播</span><span class="frame-subtitle" id="frameSubtitle">你的故事，从这里开始</span></div><div class="preview-note">布局示意 · 成品可在剪映中编辑</div><div class="specs"><span>1080 × 1920</span><span>30 fps</span><span>原生字幕</span></div></div>
+  <div class="card history-card">
+    <div class="section-title"><h3>本次任务</h3><span class="step">ACTIVITY</span></div>
+    <div id="history"><span class="hint">暂无</span></div>
+  </div></aside></div>
+  <footer class="footer"><span>用更少的操作，留更多时间给创作。</span><span>Autocut Studio · 本地运行</span></footer>
+</div>
+
+<!-- 文件夹选择器 -->
+<div class="modal-mask" id="browserModal" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="选择素材库文件夹">
+    <div class="modal-head">
+      <b>选择素材库文件夹</b>
+      <button class="btn-ghost" onclick="closeBrowser()">取消</button>
+    </div>
+    <div class="modal-path">
+      <button class="btn-ghost" onclick="browseTo(currentBrowseParent)" id="upBtn" title="上一级">↑</button>
+      <span id="browsePath" class="path-label">…</span>
+    </div>
+    <div class="quick-links" id="quickLinks"></div>
+    <div class="folder-list" id="folderList"></div>
+    <div class="modal-foot">
+      <button class="btn-primary" onclick="pickFolder()">选择此文件夹</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let mode = 'white';
+let pollTimer = null;
+let currentJob = null;
+let environment = { home: '', browse_roots: [] };
+
+const $ = id => document.getElementById(id);
+
+function setMode(m) {
+  mode = m;
+  $('modeWhite').classList.toggle('on', m === 'white');
+  $('modeMatch').classList.toggle('on', m === 'match');
+  $('modeWhite').setAttribute('aria-pressed', m === 'white');
+  $('modeMatch').setAttribute('aria-pressed', m === 'match');
+  $('frameLabel').textContent = m === 'white' ? '白底口播' : '素材混剪';
+  $('frameSymbol').textContent = m === 'white' ? 'Aa' : '▥';
+  $('libraryRow').style.display = m === 'match' ? '' : 'none';
+}
+
+async function api(path, opts) {
+  const resp = await fetch(path, opts);
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+  return data;
+}
+
+async function refreshStatus() {
+  try {
+    const s = await api('/api/status');
+    environment = s;
+    const chip = $('jyChip'), text = $('jyText');
+    if (s.jianying_running) {
+      chip.className = 'chip run'; text.textContent = '剪映运行中';
+    } else {
+      chip.className = 'chip stop'; text.textContent = '剪映已退出';
+    }
+    if (!s.smoke_approved) {
+      $('hint').textContent = '当前剪映版本未通过冒烟门禁，草稿只能停在 staging，请先在终端运行 script-to-capcutdraft smoke create';
+    }
+    if ($('voice').options.length === 0 && s.voices) {
+      for (const v of s.voices) {
+        const opt = new Option(v.name, v.id);
+        $('voice').add(opt);
+      }
+    }
+    if (s.browse_roots) {
+      const roots = s.browse_roots;
+      $('quickLinks').replaceChildren(...roots.map(root => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn-ghost';
+        button.textContent = root.name;
+        button.addEventListener('click', () => browseTo(root.path));
+        return button;
+      }));
+    }
+  } catch (e) { $('jyText').textContent = '服务连接中断'; $('jyChip').className = 'chip run'; }
+}
+
+async function quitJianying() {
+  $('quitBtn').disabled = true;
+  $('quitBtn').textContent = '正在退出…';
+  try {
+    const r = await api('/api/quit-jianying', { method: 'POST' });
+    $('jyText').textContent = r.message;
+  } catch (e) {
+    $('jyText').textContent = '退出失败：' + e.message;
+  }
+  $('quitBtn').disabled = false;
+  $('quitBtn').textContent = '退出剪映';
+  refreshStatus();
+}
+
+async function startJob() {
+  const text = $('text').value.trim();
+  const name = $('name').value.trim();
+  if (!text) { alert('文案不能为空'); return; }
+  if (!name) { alert('项目名不能为空'); return; }
+  const payload = {
+    mode,
+    text,
+    name,
+    voice: $('voice').value,
+    install: true,
+  };
+  if (mode === 'match') {
+    payload.library = $('library').value.trim();
+  }
+  $('goBtn').disabled = true;
+  $('goBtn').innerHTML = '<span class="spinner"></span> 生成中…';
+  $('log').style.display = 'none'; $('log').textContent = '';
+  $('result').className = 'result'; $('result').style.display = 'none';
+  try {
+    const job = await api('/api/jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    currentJob = job.id;
+    pollJob();
+  } catch (e) {
+    showResult('bad', '提交失败：' + e.message);
+    resetGoBtn();
+  }
+}
+
+function resetGoBtn() {
+  $('goBtn').disabled = false;
+  $('goBtn').textContent = '生成并安装 ↗';
+}
+
+async function pollJob() {
+  if (!currentJob) return;
+  let job;
+  try { job = await api('/api/jobs/' + currentJob); }
+  catch (e) { setTimeout(pollJob, 2000); return; }
+
+  if (job.lines.length) {
+    $('log').style.display = 'block';
+    $('log').textContent = job.lines.join('\n');
+    $('log').scrollTop = $('log').scrollHeight;
+  }
+  if (job.status === 'running') {
+    setTimeout(pollJob, 1200);
+    return;
+  }
+  resetGoBtn();
+  refreshHistory();
+  if (job.status === 'failed') {
+    showResult('bad', '任务失败：' + job.error);
+    return;
+  }
+  const r = job.result || {};
+  if (r.installed) {
+    showResult('ok', `✅ 已安装到剪映：${r.installed_draft}`, r.job_dir);
+  } else if (r.install_blocked) {
+    showResult('bad', `⚠️ 草稿已生成但未安装：${r.install_blocked}`,
+      r.job_dir, true);
+  } else {
+    showResult('ok', '草稿已生成（未安装）', r.job_dir, true);
+  }
+}
+
+function showResult(kind, message, jobDir, withInstall) {
+  const el = $('result');
+  el.className = 'result ' + kind;
+  el.style.display = '';
+  el.replaceChildren();
+  const messageEl = document.createElement('div');
+  messageEl.textContent = message;
+  el.append(messageEl);
+  if (jobDir) {
+    const pathEl = document.createElement('div');
+    pathEl.className = 'path'; pathEl.textContent = '任务目录：' + jobDir;
+    el.append(pathEl);
+  }
+  if (withInstall && jobDir) {
+    const button = document.createElement('button');
+    button.className = 'btn-primary'; button.style.marginTop = '10px';
+    button.textContent = '退出剪映并安装';
+    button.addEventListener('click', () => retryInstall(jobDir));
+    el.append(button);
+  }
+}
+
+async function retryInstall(jobDir) {
+  try {
+    const quit = await api('/api/quit-jianying', { method: 'POST' });
+    if (!quit.ok) { alert(quit.message); return; }
+    const job = await api('/api/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_dir: jobDir }),
+    });
+    currentJob = job.id;
+    $('goBtn').disabled = true;
+    $('goBtn').innerHTML = '<span class="spinner"></span> 安装中…';
+    pollJob();
+  } catch (e) {
+    alert('安装失败：' + e.message);
+  }
+}
+
+async function refreshHistory() {
+  try {
+    const jobs = await api('/api/jobs');
+    const el = $('history');
+    if (!jobs.length) { el.innerHTML = '<div class="empty-state"><span class="empty-icon">▤</span>第一条作品，等你开始<br><span class="hint">本次启动的任务会显示在这里</span></div>'; return; }
+    el.innerHTML = jobs.map(j => `
+      <div class="history-item">
+        <span class="name">${escHtml(j.label)}</span>
+        <span class="tag ${j.status}">${j.status === 'done' ? '完成' : j.status === 'failed' ? '失败' : '进行中'}</span>
+        <span class="hint">${j.elapsed}s</span>
+      </div>`).join('');
+  } catch (e) { /* 忽略 */ }
+}
+
+refreshStatus();
+refreshHistory();
+setInterval(refreshStatus, 5000);
+
+/* ---------- 文件夹选择器 ---------- */
+let browseCurrent = '';
+let currentBrowseParent = '';
+let browseDirs = [];
+
+const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function openBrowser() {
+  $('browserModal').style.display = 'flex';
+  $('browserModal').querySelector('button').focus();
+  const existing = $('library').value.trim();
+  browseTo(existing || environment.home || '.');
+}
+
+function closeBrowser() {
+  $('browserModal').style.display = 'none';
+  $('library').focus();
+}
+
+function browseEnter(i) {
+  const separator = browseCurrent.includes('\\') ? '\\' : '/';
+  browseTo(browseCurrent.replace(/[\\\/]$/, '') + separator + browseDirs[i]);
+}
+
+async function browseTo(path) {
+  if (!path) return;
+  $('folderList').innerHTML = '<div class="folder-empty">读取中…</div>';
+  try {
+    const data = await api('/api/browse?path=' + encodeURIComponent(path));
+    if (data.error) {
+      $('folderList').innerHTML = `<div class="folder-empty">${escHtml(data.error)}</div>`;
+      return;
+    }
+    browseCurrent = data.path;
+    currentBrowseParent = data.parent;
+    browseDirs = data.dirs;
+    $('browsePath').textContent = data.path;
+    $('upBtn').style.visibility = data.parent ? 'visible' : 'hidden';
+    if (!data.dirs.length) {
+      $('folderList').innerHTML = '<div class="folder-empty">这里没有子文件夹</div>';
+      return;
+    }
+    $('folderList').innerHTML = data.dirs.map((d, i) =>
+      `<button type="button" class="folder-item" onclick="browseEnter(${i})">
+         <span class="ico">📁</span><span>${escHtml(d)}</span>
+       </button>`).join('');
+  } catch (e) {
+    $('folderList').innerHTML = `<div class="folder-empty">读取失败：${escHtml(e.message)}</div>`;
+  }
+}
+
+function pickFolder() {
+  if (browseCurrent) {
+    $('library').value = browseCurrent;
+  }
+  closeBrowser();
+}
+
+$('browserModal').addEventListener('click', e => {
+  if (e.target === $('browserModal')) closeBrowser();
+});
+$('text').addEventListener('input', () => {
+  $('charCount').textContent = [...$('text').value.replace(/\s/g, '')].length + ' 字';
+  $('frameSubtitle').textContent = $('text').value.trim().split(/[\n，。！？]/)[0].slice(0, 22) || '你的故事，从这里开始';
+});
+document.addEventListener('keydown', e => {
+  if ($('browserModal').style.display === 'none') return;
+  if (e.key === 'Escape') closeBrowser();
+  if (e.key === 'Tab') {
+    const buttons = [...$('browserModal').querySelectorAll('button')].filter(b => !b.disabled && getComputedStyle(b).visibility !== 'hidden');
+    const first = buttons[0], last = buttons[buttons.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
+</script>
+</body>
+</html>

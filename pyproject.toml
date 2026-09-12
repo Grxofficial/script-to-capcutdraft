@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "script-to-capcutdraft"
+version = "0.1.0"
+description = "将文案与本地视频素材生成带旁白和原生字幕的可编辑剪映草稿"
+readme = "README.md"
+requires-python = ">=3.11,<3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
+authors = [{ name = "Grxofficial" }]
+dependencies = [
+  "pyJianYingDraft @ git+https://github.com/GuanYixuan/pyJianYingDraft.git@c3318066d964744e2bfc66f75c71745fe8cea52a",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pyyaml>=6,<7",
+]
+scene = [
+  "numpy>=2.0,<3",
+  "torch>=2.6,<3",
+  "transnetv2-pytorch==1.0.5",
+]
+
+[project.scripts]
+autocut = "autocut_agent.cli:main"
+script-to-capcutdraft = "autocut_agent.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Grxofficial/script-to-capcutdraft"
+Repository = "https://github.com/Grxofficial/script-to-capcutdraft"
+Issues = "https://github.com/Grxofficial/script-to-capcutdraft/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+autocut_agent = ["webui.html"]

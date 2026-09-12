@@ -1,0 +1,29 @@
+Script to CapCut Draft
+Copyright 2026 Script to CapCut Draft contributors
+
+Licensed under the Apache License, Version 2.0.
+
+This project uses or contains work based on the following projects:
+
+- GuanYixuan/pyJianYingDraft
+  Copyright 2024 Gary Guan
+  Source: https://github.com/GuanYixuan/pyJianYingDraft
+  Base revision: c3318066d964744e2bfc66f75c71745fe8cea52a
+  License: Apache License 2.0
+  Use: Jianying draft structure generation.
+
+- FireRedTeam/FireRed-OpenStoryline
+  Copyright 2026 FireRed-OpenStoryline Authors
+  Source: https://github.com/FireRedTeam/FireRed-OpenStoryline
+  License: Apache License 2.0
+  Use: architectural reference for scene detection and structured media understanding.
+
+- Vincentwei1021/video-shotcraft
+  Copyright 2026 Wei Yihao
+  Source: https://github.com/Vincentwei1021/video-shotcraft
+  License: Apache License 2.0
+  Use: portions of draft packaging, registration, backup and rollback design were adapted.
+
+All upstream copyrights remain with their respective owners.
+All trademarks and product names belong to their respective owners.
+This project is not affiliated with or endorsed by Jianying, CapCut, ByteDance or Volcano Engine.

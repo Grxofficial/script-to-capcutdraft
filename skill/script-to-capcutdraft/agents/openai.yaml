@@ -1,0 +1,4 @@
+interface:
+  display_name: "Script to CapCut Draft"
+  short_description: "安装、配置并运行文案驱动的本地 AI 剪映草稿生成工作流"
+  default_prompt: "使用 $script-to-capcutdraft 安装、配置或运行文案驱动的剪映草稿生成器。"
