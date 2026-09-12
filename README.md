@@ -1,6 +1,6 @@
 <div align="center">
 
-# Script to CapCut Draft
+# script-to-capcutdraft
 
 把一篇文案和一堆本地素材，变成一份可以继续修改的剪映草稿。
 
