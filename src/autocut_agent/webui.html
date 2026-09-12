@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Autocut Studio · 创作工作台</title>
+<title>Script to Draft · 创作工作台</title>
 <style>
   :root {
     --bg: #f4f5f7; --card: #ffffff; --line: #e3e5e8;
@@ -121,7 +121,7 @@
   .eyebrow { font-size:11px;letter-spacing:2px;color:#8c899c;font-weight:650;margin:0 0 10px; }
   .intro h2 { font-size:34px;line-height:1.2;letter-spacing:-1.1px;margin:0 0 12px;font-weight:650; }
   .intro p { color:var(--sub);margin:0;font-size:14px; }
-  .local-badge { font-size:12px;color:#686775;white-space:nowrap;padding-bottom:4px; }
+  .workflow-badge { font-size:12px;color:#686775;white-space:nowrap;padding-bottom:4px; }
   .workspace { display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-items:start; }
   .card { border:1px solid #e5e5eb;border-radius:22px;padding:26px;box-shadow:0 4px 20px #24243804;margin:0; }
   .section-title { display:flex;align-items:center;justify-content:space-between;margin-bottom:20px; }
@@ -156,11 +156,15 @@
   .sidebar { display:grid;gap:18px; }
   .preview-card { background:linear-gradient(145deg,#ece9f5,#e8eaf2);padding:25px;border-radius:22px;position:relative;overflow:hidden; }
   .preview-title { font-size:12px;color:#78738e;display:flex;justify-content:space-between; }
-  .frame { width:144px;height:256px;margin:24px auto; border-radius:12px;background:#fff;box-shadow:0 16px 35px #55516c1c;position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;overflow:hidden; }
-  .frame-symbol { color:#d5d0e3;font-size:36px;font-weight:200; }
-  .frame-label { font-size:9px;color:#aaa5b8;margin-top:8px; }
-  .frame-subtitle { position:absolute;bottom:48px;font-size:10px;max-width:126px;text-align:center;color:#5f5c6a; }
-  .preview-note { font-size:11px;text-align:center;color:#938da5; }
+  .frame { width:144px;height:256px;margin:24px auto 17px; border-radius:12px;background:#fff;box-shadow:0 16px 35px #55516c1c;position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;overflow:hidden; }
+  .frame video { width:100%;height:100%;object-fit:cover;display:none;background:#16161a; }
+  .frame-content { position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:14px; }
+  .frame-kicker { font-size:8px;letter-spacing:1.2px;color:#aaa5b8;margin-bottom:8px; }
+  .frame-label { font-size:12px;color:#474550;font-weight:650; }
+  .frame-subtitle { position:absolute;bottom:43px;font-size:10px;max-width:126px;text-align:center;color:#5f5c6a;line-height:1.55; }
+  .frame-tracks { position:absolute;bottom:13px;font-size:7px;color:#aaa5b8;background:#f4f3f8;border-radius:999px;padding:3px 7px; }
+  .preview-note { font-size:11px;text-align:center;color:#777184;line-height:1.55;min-height:34px; }
+  .preview-source { display:block;color:#9691a5;font:9px/1.45 var(--mono);word-break:break-all;margin-top:3px; }
   .specs { display:flex;justify-content:center;gap:7px;margin-top:17px; }
   .specs span { background:#ffffff65;border:1px solid #ffffff70;border-radius:6px;padding:3px 7px;font-size:10px;color:#777184; }
   .history-card { padding:22px; }
@@ -171,12 +175,25 @@
   .empty-state { padding:18px 0 8px;text-align:center;color:#9b99a5;font-size:12px; }
   .empty-icon { font-size:25px;display:block;color:#c0bdcb;margin-bottom:7px; }
   .footer { display:flex;justify-content:space-between;margin-top:25px;font-size:11px;color:#a09da9; }
+  .library-head { display:flex;align-items:center;justify-content:space-between;margin-top:21px; }
+  .library-head label { margin:0; }
+  .library-count { font-size:11px;color:#96939f;font-weight:500; }
+  .library-list { border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:8px;background:#fafafb; }
+  .library-empty { padding:15px;color:#96939f;font-size:12px;text-align:center; }
+  .library-item { display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);background:#fff; }
+  .library-item:last-child { border-bottom:0; }
+  .library-info { min-width:0;flex:1; }
+  .library-name { font-size:12px;font-weight:620;color:#3e4048;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .library-path { font:9px/1.45 var(--mono);color:#9997a1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .remove-library { padding:5px 8px;background:transparent;color:#8c8994;font-size:16px;line-height:1;box-shadow:none; }
+  .remove-library:hover { background:#f0eff4;color:#4f4c58; }
+  .add-library { margin-top:8px;width:100%;background:#f0eff5;color:#5f5b70;border:1px dashed #d9d5e8; }
   .modal-mask { background:#20202c38;backdrop-filter:blur(7px); }
   .modal { background:#fffffff5;border:1px solid #fff9;border-radius:22px;padding:23px;box-shadow:0 25px 100px #16132930; }
   .folder-item { width:100%;text-align:left;background:transparent;border-radius:0;font-weight:400; }
   .log { background:#f5f5f9;color:#656271;font-size:11px; }
   @media(max-width:850px) { .wrap{padding:22px;} .workspace{grid-template-columns:1fr;} .sidebar{grid-template-columns:1fr 1fr;} .intro h2{font-size:29px;} header{margin-bottom:30px;} }
-  @media(max-width:520px) { .sidebar{grid-template-columns:1fr;} .row{flex-direction:column;gap:0;} .intro{display:block;} .local-badge{display:none;} .card{padding:20px;} .wrap{padding:18px 14px;} header h1{flex-basis:100%;} .footer{gap:12px;} }
+  @media(max-width:520px) { .sidebar{grid-template-columns:1fr;} .row{flex-direction:column;gap:0;} .intro{display:block;} .workflow-badge{display:none;} .card{padding:20px;} .wrap{padding:18px 14px;} header h1{flex-basis:100%;} .footer{gap:12px;} }
   @media(prefers-reduced-motion:reduce) { *,*::before,*::after{animation:none!important;transition:none!important;} }
   @media(prefers-reduced-transparency:reduce) { .modal{background:#fff;} .modal-mask{backdrop-filter:none;} }
   @media(prefers-contrast:more) { :root{--sub:#50515b;--line:#999;} .hint,.editor-foot,.footer{color:#555;} }
@@ -190,7 +207,7 @@
     <button class="btn-ghost" id="quitBtn" onclick="quitJianying()">退出剪映</button>
   </header>
 
-  <section class="intro"><div><div class="eyebrow">YOUR EVERYDAY CREATIVE SPACE</div><h2>让文案，成为画面。</h2><p>写下你的文案，旁白、字幕与镜头交给本地工作流。</p></div><span class="local-badge">◉ 本地工作空间</span></section>
+  <section class="intro"><div><div class="eyebrow">YOUR EVERYDAY CREATIVE SPACE</div><h2>让文案，成为画面。</h2><p>输入文案和素材，调用你配置的云端模型完成拆句、配音与镜头匹配。</p></div><span class="workflow-badge">本机生成草稿 · 云端 AI 推理</span></section>
   <div class="workspace">
   <main class="card">
     <div class="section-title"><h3>创建新作品</h3><span class="step">01 / 创作</span></div>
@@ -215,11 +232,9 @@
     </div>
 
     <div id="libraryRow" style="display:none">
-      <label for="library">素材库路径</label>
-      <div style="display:flex; gap:8px">
-        <input type="text" id="library" placeholder="选择本地素材库文件夹" style="flex:1">
-        <button class="btn-ghost" type="button" onclick="openBrowser()">浏览…</button>
-      </div>
+      <div class="library-head"><label>素材文件夹</label><span class="library-count" id="libraryCount">0 个</span></div>
+      <div class="library-list" id="libraryList"><div class="library-empty">还没有添加素材文件夹</div></div>
+      <button class="add-library" type="button" onclick="openBrowser()">＋ 添加素材文件夹</button>
     </div>
 
     <div class="actions">
@@ -231,12 +246,12 @@
     <div class="result" id="result" role="status" aria-live="polite"></div>
   </main>
 
-  <aside class="sidebar"><div class="preview-card"><div class="preview-title"><span>画布概览</span><span>9:16</span></div><div class="frame"><span class="frame-symbol" id="frameSymbol">Aa</span><span class="frame-label" id="frameLabel">白底口播</span><span class="frame-subtitle" id="frameSubtitle">你的故事，从这里开始</span></div><div class="preview-note">布局示意 · 成品可在剪映中编辑</div><div class="specs"><span>1080 × 1920</span><span>30 fps</span><span>原生字幕</span></div></div>
+  <aside class="sidebar"><div class="preview-card"><div class="preview-title"><span>输出预览</span><span>9:16</span></div><div class="frame"><video id="frameVideo" muted loop playsinline preload="metadata"></video><div class="frame-content" id="frameContent"><span class="frame-kicker" id="frameKicker">WHITE CANVAS</span><span class="frame-label" id="frameLabel">纯白画面</span><span class="frame-subtitle" id="frameSubtitle">你的故事，从这里开始</span><span class="frame-tracks" id="frameTracks">旁白 · 原生字幕</span></div></div><div class="preview-note"><span id="previewNote">白底口播 · 画面始终为纯白色</span><span class="preview-source" id="previewSource">旁白和字幕会按句对齐</span></div><div class="specs"><span>1080 × 1920</span><span>30 fps</span><span>原生字幕</span></div></div>
   <div class="card history-card">
     <div class="section-title"><h3>本次任务</h3><span class="step">ACTIVITY</span></div>
     <div id="history"><span class="hint">暂无</span></div>
   </div></aside></div>
-  <footer class="footer"><span>用更少的操作，留更多时间给创作。</span><span>Autocut Studio · 本地运行</span></footer>
+  <footer class="footer"><span>用更少的操作，留更多时间给创作。</span><span>Script to Draft · AI 辅助剪映草稿</span></footer>
 </div>
 
 <!-- 文件夹选择器 -->
@@ -253,7 +268,7 @@
     <div class="quick-links" id="quickLinks"></div>
     <div class="folder-list" id="folderList"></div>
     <div class="modal-foot">
-      <button class="btn-primary" onclick="pickFolder()">选择此文件夹</button>
+      <button class="btn-primary" onclick="pickFolder()">添加这个文件夹</button>
     </div>
   </div>
 </div>
@@ -263,6 +278,8 @@ let mode = 'white';
 let pollTimer = null;
 let currentJob = null;
 let environment = { home: '', browse_roots: [] };
+let libraries = [];
+let previewRequest = 0;
 
 const $ = id => document.getElementById(id);
 
@@ -272,9 +289,81 @@ function setMode(m) {
   $('modeMatch').classList.toggle('on', m === 'match');
   $('modeWhite').setAttribute('aria-pressed', m === 'white');
   $('modeMatch').setAttribute('aria-pressed', m === 'match');
-  $('frameLabel').textContent = m === 'white' ? '白底口播' : '素材混剪';
-  $('frameSymbol').textContent = m === 'white' ? 'Aa' : '▥';
   $('libraryRow').style.display = m === 'match' ? '' : 'none';
+  updatePreview();
+}
+
+function folderName(path) {
+  const parts = path.replace(/[\\\/]+$/, '').split(/[\\\/]/);
+  return parts[parts.length - 1] || path;
+}
+
+function renderLibraries() {
+  $('libraryCount').textContent = libraries.length + ' 个';
+  if (!libraries.length) {
+    $('libraryList').innerHTML = '<div class="library-empty">还没有添加素材文件夹</div>';
+  } else {
+    $('libraryList').innerHTML = libraries.map((path, index) => `
+      <div class="library-item">
+        <span aria-hidden="true">📁</span>
+        <div class="library-info"><div class="library-name">${escHtml(folderName(path))}</div><div class="library-path" title="${escHtml(path)}">${escHtml(path)}</div></div>
+        <button type="button" class="remove-library" onclick="removeLibrary(${index})" aria-label="移除 ${escHtml(folderName(path))}">×</button>
+      </div>`).join('');
+  }
+  updatePreview();
+}
+
+function addLibrary(path) {
+  const normalized = path.trim().replace(/[\\\/]+$/, '');
+  if (normalized && !libraries.includes(normalized)) libraries.push(normalized);
+  renderLibraries();
+}
+
+function removeLibrary(index) {
+  libraries.splice(index, 1);
+  renderLibraries();
+}
+
+function showWhitePreview() {
+  const video = $('frameVideo');
+  video.pause(); video.removeAttribute('src'); video.load(); video.style.display = 'none';
+  $('frameContent').style.display = 'flex';
+  $('frameKicker').textContent = 'WHITE CANVAS';
+  $('frameLabel').textContent = '纯白画面';
+  $('frameTracks').textContent = '旁白 · 原生字幕';
+  $('previewNote').textContent = '白底口播 · 画面始终为纯白色';
+  $('previewSource').textContent = '旁白和字幕会按句对齐';
+}
+
+async function updatePreview() {
+  const request = ++previewRequest;
+  if (mode === 'white') { showWhitePreview(); return; }
+  const video = $('frameVideo');
+  video.pause(); video.removeAttribute('src'); video.load(); video.style.display = 'none';
+  $('frameContent').style.display = 'flex';
+  $('frameKicker').textContent = 'MEDIA PREVIEW';
+  $('frameLabel').textContent = libraries.length ? '正在读取素材…' : '等待素材';
+  $('frameTracks').textContent = '静音画面 · 旁白 · 原生字幕';
+  $('previewNote').textContent = libraries.length ? '正在从素材文件夹抽取样片' : '添加素材文件夹后，这里会预览一条视频';
+  $('previewSource').textContent = libraries.length ? libraries[0] : '实际镜头会按文案语义自动匹配';
+  for (const library of libraries) {
+    try {
+      const data = await api('/api/library-preview?path=' + encodeURIComponent(library));
+      if (request !== previewRequest) return;
+      if (!data.found) continue;
+      video.src = data.url;
+      video.style.display = 'block';
+      $('frameContent').style.display = 'none';
+      $('previewNote').textContent = '素材样片 · ' + data.name;
+      $('previewSource').textContent = data.library + ' · 实际镜头由文案匹配';
+      video.play().catch(() => {});
+      return;
+    } catch (e) { /* 尝试下一个文件夹 */ }
+  }
+  if (request !== previewRequest) return;
+  $('frameLabel').textContent = libraries.length ? '没有找到视频' : '等待素材';
+  $('previewNote').textContent = libraries.length ? '已选文件夹中没有可预览的视频' : '添加素材文件夹后，这里会预览一条视频';
+  $('previewSource').textContent = libraries.length ? '支持 MP4、MOV、M4V、MKV、AVI、WebM' : '实际镜头会按文案语义自动匹配';
 }
 
 async function api(path, opts) {
@@ -344,7 +433,8 @@ async function startJob() {
     install: true,
   };
   if (mode === 'match') {
-    payload.library = $('library').value.trim();
+    if (!libraries.length) { alert('请至少添加一个素材文件夹'); return; }
+    payload.libraries = libraries;
   }
   $('goBtn').disabled = true;
   $('goBtn').innerHTML = '<span class="spinner"></span> 生成中…';
@@ -469,13 +559,12 @@ const escHtml = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g
 function openBrowser() {
   $('browserModal').style.display = 'flex';
   $('browserModal').querySelector('button').focus();
-  const existing = $('library').value.trim();
-  browseTo(existing || environment.home || '.');
+  browseTo(libraries[libraries.length - 1] || environment.home || '.');
 }
 
 function closeBrowser() {
   $('browserModal').style.display = 'none';
-  $('library').focus();
+  document.querySelector('.add-library').focus();
 }
 
 function browseEnter(i) {
@@ -511,9 +600,7 @@ async function browseTo(path) {
 }
 
 function pickFolder() {
-  if (browseCurrent) {
-    $('library').value = browseCurrent;
-  }
+  if (browseCurrent) addLibrary(browseCurrent);
   closeBrowser();
 }
 

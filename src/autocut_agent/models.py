@@ -81,7 +81,7 @@ class TimelineUnit:
 class JobPlan:
     name: str
     script_path: str
-    library_path: str
+    library_path: str | list[str]
     canvas: dict[str, int]
     units: list[TimelineUnit]
     warnings: list[str] = field(default_factory=list)

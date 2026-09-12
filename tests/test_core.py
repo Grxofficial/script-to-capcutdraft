@@ -24,6 +24,7 @@ from autocut_agent.models import ClipRecord, ScriptUnit
 from autocut_agent.report import to_srt
 from autocut_agent.script import clean_segment_text, normalize_for_compare, split_script, split_units
 from autocut_agent.tts import DoubaoTTS, probe_media_audio, tighten_audio
+from autocut_agent.webapp import _find_preview_video
 
 
 class FakeAI(OpenAICompatibleClient):
@@ -361,6 +362,36 @@ class CoreTests(unittest.TestCase):
                 self.assertEqual(database.stats(root), {"files": 1, "clips": 1})
                 self.assertEqual(database.prune_missing(root, set()), 1)
                 self.assertEqual(database.stats(root), {"files": 0, "clips": 0})
+
+    def test_database_combines_multiple_material_folders(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            first, second = root / "first", root / "second"
+            first.mkdir(); second.mkdir()
+            videos = [first / "a.mp4", second / "b.mov"]
+            for video in videos:
+                video.write_bytes(b"test")
+            from autocut_agent.models import MediaInfo
+            with LibraryDB(root / "index.sqlite3") as database:
+                for index, (library, video) in enumerate(zip((first, second), videos), start=1):
+                    database.replace_file(
+                        library, MediaInfo(video, 2, 1080, 1920, 30), f"hash-{index}", 4, 1, "v1",
+                        [{"source_start": 0, "source_end": 2, "caption": video.stem,
+                          "metadata": {}, "embedding": [1, 0]}],
+                    )
+                clips = database.clips_for_libraries([first, second, first])
+            self.assertEqual([Path(clip.path).name for clip in clips], ["a.mp4", "b.mov"])
+
+    def test_preview_video_is_supported_and_not_hidden(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            hidden = root / ".cache"
+            hidden.mkdir()
+            (hidden / "a.mp4").write_bytes(b"hidden")
+            (root / "notes.txt").write_text("不是视频", encoding="utf-8")
+            expected = root / "sample.mov"
+            expected.write_bytes(b"video")
+            self.assertEqual(_find_preview_video(root), expected.resolve())
 
 
 if __name__ == "__main__":

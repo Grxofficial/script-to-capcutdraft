@@ -148,11 +148,18 @@ class LibraryDB:
         return len(stale)
 
     def clips_for_library(self, library_root: Path) -> list[ClipRecord]:
+        return self.clips_for_libraries([library_root])
+
+    def clips_for_libraries(self, library_roots: Iterable[Path]) -> list[ClipRecord]:
+        roots = list(dict.fromkeys(str(root.resolve()) for root in library_roots))
+        if not roots:
+            return []
+        placeholders = ",".join("?" for _ in roots)
         rows = self.connection.execute(
-            """SELECT c.*,m.path,m.width,m.height,m.fps FROM clips c
+            f"""SELECT c.*,m.path,m.width,m.height,m.fps FROM clips c
             JOIN media_files m ON m.id=c.file_id
-            WHERE m.library_root=? AND m.error='' ORDER BY c.id""",
-            (str(library_root.resolve()),),
+            WHERE m.library_root IN ({placeholders}) AND m.error='' ORDER BY c.id""",
+            roots,
         ).fetchall()
         return [ClipRecord(
             id=int(row["id"]), file_id=int(row["file_id"]), path=row["path"],

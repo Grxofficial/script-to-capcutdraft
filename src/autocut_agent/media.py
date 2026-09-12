@@ -236,7 +236,7 @@ class MediaIndexer:
         )
         return "|".join(values)
 
-    def run(self, library: Path, rebuild: bool = False) -> dict[str, int]:
+    def run(self, library: Path, rebuild: bool = False, allow_empty: bool = False) -> dict[str, int]:
         root = library.expanduser().resolve()
         if not root.is_dir():
             raise AutocutError(f"素材库目录不存在：{root}")
@@ -245,6 +245,10 @@ class MediaIndexer:
             if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS and not any(part.startswith(".") for part in path.relative_to(root).parts)
         )
         if not paths:
+            if allow_empty:
+                with LibraryDB(self.config.database_path) as database:
+                    pruned = database.prune_missing(root, set())
+                return {"scanned": 0, "indexed": 0, "skipped": 0, "failed": 0, "pruned": pruned}
             raise AutocutError(f"素材库里没有支持的视频：{root}")
         counters = {"scanned": len(paths), "indexed": 0, "skipped": 0, "failed": 0, "pruned": 0}
         with LibraryDB(self.config.database_path) as database:

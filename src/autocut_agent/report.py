@@ -39,16 +39,19 @@ def _srt_time(seconds: float) -> str:
 
 
 def to_markdown(plan: JobPlan) -> str:
-    library_label = plan.library_path or "白底图（无素材匹配）"
     lines = [
         f"# {plan.name} 匹配报告",
         "",
         f"- 总时长：{plan.duration:.3f} 秒",
         f"- 文案单元：{len(plan.units)}",
-        f"- 素材库：`{library_label}`",
-        "- 红色警告标记：`🔴 建议人工替换`",
-        "",
     ]
+    if isinstance(plan.library_path, list):
+        lines.append(f"- 素材文件夹：{len(plan.library_path)} 个")
+        lines.extend(f"  - `{path}`" for path in plan.library_path)
+    else:
+        library_label = plan.library_path or "白底图（无素材匹配）"
+        lines.append(f"- 素材库：`{library_label}`")
+    lines.extend(["- 红色警告标记：`🔴 建议人工替换`", ""])
     for unit in plan.units:
         lines.extend([
             f"## {unit.index}. {unit.text}",

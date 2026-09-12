@@ -29,7 +29,7 @@ class TimelinePlanner:
         self,
         name: str,
         script_path: str,
-        library_path: str,
+        library_path: str | list[str],
         units: list[ScriptUnit],
         clips: list[ClipRecord],
         canvas: dict[str, int],

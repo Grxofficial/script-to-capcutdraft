@@ -65,16 +65,22 @@ def install_staged_draft(
 def create_job(
     config: AppConfig,
     script_path: Path,
-    library_path: Path,
+    library_path: Path | list[Path],
     name: str,
     progress: Callable[[str], None] = print,
 ) -> dict[str, object]:
     config.require_ai()
     config.require_doubao_tts()
     script_file = script_path.expanduser().resolve()
-    library = library_path.expanduser().resolve()
+    raw_libraries = [library_path] if isinstance(library_path, Path) else library_path
+    libraries = list(dict.fromkeys(path.expanduser().resolve() for path in raw_libraries))
     if not script_file.is_file():
         raise AutocutError(f"文案文件不存在：{script_file}")
+    if not libraries:
+        raise AutocutError("至少需要一个素材文件夹")
+    for library in libraries:
+        if not library.is_dir():
+            raise AutocutError(f"素材库目录不存在：{library}")
     original = script_file.read_text(encoding="utf-8").strip()
     ai = OpenAICompatibleClient(config.ai, config.state_dir / "ai-cache")
     progress("语义拆分文案")
@@ -85,10 +91,18 @@ def create_job(
     job_dir = config.jobs_dir / safe_name(name)
     job_dir.mkdir(parents=True, exist_ok=True)
 
-    progress("更新素材索引")
-    index_stats = MediaIndexer(config, ai, progress).run(library)
+    progress(f"更新素材索引（{len(libraries)} 个文件夹）")
+    roots: list[dict[str, object]] = []
+    totals = {"scanned": 0, "indexed": 0, "skipped": 0, "failed": 0, "pruned": 0}
+    indexer = MediaIndexer(config, ai, progress)
+    for library in libraries:
+        stats = indexer.run(library, allow_empty=True)
+        roots.append({"path": str(library), **stats})
+        for key in totals:
+            totals[key] += int(stats.get(key, 0))
+    index_stats: dict[str, object] = {**totals, "libraries": len(libraries), "roots": roots}
     with LibraryDB(config.database_path) as database:
-        clips = database.clips_for_library(library)
+        clips = database.clips_for_libraries(libraries)
     if not clips:
         raise AutocutError("索引完成后仍没有可用镜头，请运行 inspect 检查失败项")
 
@@ -98,7 +112,7 @@ def create_job(
     plan = TimelinePlanner(config.matching, ai).create_plan(
         draft_name,
         str(script_file),
-        str(library),
+        str(libraries[0]) if len(libraries) == 1 else [str(path) for path in libraries],
         units,
         clips,
         {"width": config.canvas.width, "height": config.canvas.height, "fps": config.canvas.fps},

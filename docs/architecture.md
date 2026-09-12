@@ -40,7 +40,7 @@ LLM 语义拆句（校验不改写，失败回退逗号级规则）
 
 ### 网页控制台（`serve`）
 
-标准库 `http.server` 实现的本地单用户控制台（仅绑定 127.0.0.1，零第三方 web 依赖）。前端 `webui.html` 每次请求现读，改界面无需重启；任务在后台线程执行 `create_job` / `create_white_job`，进度写入 `WebJob` 由前端轮询。提供剪映状态检查、用户主动的"退出剪映"（AppleScript 优雅退出 → SIGTERM → SIGKILL 三级递进）和被门禁拦下后的重试安装。
+标准库 `http.server` 实现的单用户控制台（界面仅绑定 127.0.0.1，零第三方 web 依赖；模型推理仍调用配置的云端服务）。前端 `webui.html` 每次请求现读，改界面无需重启；任务在后台线程执行 `create_job` / `create_white_job`，进度写入 `WebJob` 由前端轮询。素材混剪可合并多个素材文件夹，并从所选目录抽取一条静音样片用于界面预览。控制台还提供剪映状态检查、用户主动的"退出剪映"（AppleScript 优雅退出 → SIGTERM → SIGKILL 三级递进）和被门禁拦下后的重试安装。
 
 素材索引是独立的增量流程：FFprobe 读取媒体参数，TransNetV2（失败时 FFmpeg 回退）切镜，抽取首/中/尾关键帧，由视觉模型生成结构化画面事实，再向量化写入 SQLite。
 
@@ -58,7 +58,7 @@ LLM 语义拆句（校验不改写，失败回退逗号级规则）
 | `mac_install.py` / `windows_install.py` | 媒体打包、剪映运行检测、注册表备份、同名替换和回滚 |
 | `pipeline.py` | 混剪任务编排、任务产物落盘与 staging 安装 |
 | `batch.py` | Markdown 拆分、原文去重、逐条执行、失败隔离和断点状态 |
-| `webapp.py` + `webui.html` | 本地网页控制台：任务提交、进度轮询、剪映状态与退出、文件夹浏览 |
+| `webapp.py` + `webui.html` | 网页创作台：任务提交、进度轮询、剪映状态与退出、多文件夹选择、素材样片预览 |
 
 ## 缓存与失效
 

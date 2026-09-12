@@ -1,17 +1,19 @@
-"""本地网页控制台：可视化提交白底/混剪任务并管理剪映进程。
+"""网页创作台：可视化提交白底/混剪任务并管理剪映进程。
 
-仅绑定 127.0.0.1，单用户使用，不引入第三方 web 框架。
+界面仅绑定 127.0.0.1；模型推理按配置调用云端服务。
 """
 
 from __future__ import annotations
 
 import json
+import mimetypes
 import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import parse_qs, quote, urlparse
 
 from .config import AppConfig, load_config
 from .errors import AutocutError
@@ -24,6 +26,7 @@ from .platform_adapter import (
 )
 from .pipeline import create_job, install_job, safe_name
 from .compose import create_white_job
+from .media import VIDEO_EXTENSIONS
 
 # 用户已试听选定的常用豆包音色（voice_type -> 展示名）
 COMMON_VOICES = [
@@ -35,6 +38,21 @@ COMMON_VOICES = [
     ("zh_female_qingxinnvsheng_uranus_bigtts", "清新女声 2.0"),
     ("zh_female_cancan_uranus_bigtts", "知性灿灿 2.0"),
 ]
+
+
+def _find_preview_video(library: Path) -> Path | None:
+    """稳定选出首条非隐藏视频；这里只做界面预览，不参与镜头匹配。"""
+    try:
+        candidates = (
+            path.resolve()
+            for path in library.rglob("*")
+            if path.is_file()
+            and path.suffix.lower() in VIDEO_EXTENSIONS
+            and not any(part.startswith(".") for part in path.relative_to(library).parts)
+        )
+        return next(iter(sorted(candidates, key=lambda path: str(path).lower())), None)
+    except OSError:
+        return None
 
 class WebJob:
     """一次生成任务的线程安全状态记录。"""
@@ -134,16 +152,29 @@ def _run_compose(runner: JobRunner, payload: dict[str, Any]) -> WebJob:
 def _run_create(runner: JobRunner, payload: dict[str, Any]) -> WebJob:
     text = str(payload.get("text") or "").strip()
     name = str(payload.get("name") or "").strip()
-    library = str(payload.get("library") or "").strip()
+    raw_libraries = payload.get("libraries")
+    if not isinstance(raw_libraries, list):
+        legacy_library = str(payload.get("library") or "").strip()
+        raw_libraries = [legacy_library] if legacy_library else []
+    libraries: list[Path] = []
+    seen: set[Path] = set()
+    for raw in raw_libraries:
+        value = str(raw or "").strip()
+        if not value:
+            continue
+        path = Path(value).expanduser().resolve()
+        if path not in seen:
+            seen.add(path)
+            libraries.append(path)
     if not text:
         raise ValueError("文案不能为空")
     if not name:
         raise ValueError("项目名不能为空")
-    if not library:
-        raise ValueError("素材匹配模式必须填写素材库路径")
-    library_path = Path(library).expanduser()
-    if not library_path.is_dir():
-        raise ValueError(f"素材库目录不存在：{library_path}")
+    if not libraries:
+        raise ValueError("素材混剪模式至少需要一个素材文件夹")
+    for library in libraries:
+        if not library.is_dir():
+            raise ValueError(f"素材库目录不存在：{library}")
 
     script_path = runner.config.state_dir / "web-scripts" / f"{safe_name(name)}-{uuid.uuid4().hex[:6]}.txt"
     script_path.parent.mkdir(parents=True, exist_ok=True)
@@ -152,7 +183,7 @@ def _run_create(runner: JobRunner, payload: dict[str, Any]) -> WebJob:
     label = f"素材混剪 · {name}"
 
     def work(job: WebJob) -> dict[str, Any]:
-        return create_job(runner.config, script_path, library_path, name, progress=job.log)
+        return create_job(runner.config, script_path, libraries, name, progress=job.log)
 
     return runner.submit("create", label, work)
 
@@ -171,6 +202,7 @@ def _run_install(runner: JobRunner, payload: dict[str, Any]) -> WebJob:
 
 def make_handler(runner: JobRunner, html_path: Path) -> type[BaseHTTPRequestHandler]:
     config = runner.config
+    preview_files: set[Path] = set()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt: str, *args: Any) -> None:  # 静默访问日志
@@ -195,8 +227,6 @@ def make_handler(runner: JobRunner, html_path: Path) -> type[BaseHTTPRequestHand
 
         def _browse(self) -> dict[str, Any]:
             """列出目录下的子文件夹，供前端文件夹选择器使用。"""
-            from urllib.parse import parse_qs, urlparse
-
             query = parse_qs(urlparse(self.path).query)
             raw = (query.get("path") or [""])[0]
             target = Path(raw).expanduser() if raw else Path.home()
@@ -224,8 +254,85 @@ def make_handler(runner: JobRunner, html_path: Path) -> type[BaseHTTPRequestHand
                 "dirs": sorted(dirs, key=str.lower),
             }
 
+        def _library_preview(self) -> dict[str, Any]:
+            """从素材文件夹中找一条代表视频，供画布区域做只读预览。"""
+            query = parse_qs(urlparse(self.path).query)
+            raw = (query.get("path") or [""])[0]
+            library = Path(raw).expanduser() if raw else None
+            if library is None:
+                return {"found": False, "error": "缺少素材文件夹路径"}
+            try:
+                library = library.resolve()
+            except OSError:
+                return {"found": False, "error": f"路径无法解析：{raw}"}
+            if not library.is_dir():
+                return {"found": False, "error": f"不是文件夹：{library}"}
+            video = _find_preview_video(library)
+            if video is None:
+                return {"found": False, "library": str(library)}
+            preview_files.add(video)
+            return {
+                "found": True,
+                "library": str(library),
+                "path": str(video),
+                "name": video.name,
+                "url": "/api/media-preview?path=" + quote(str(video)),
+            }
+
+        def _send_preview_video(self) -> None:
+            query = parse_qs(urlparse(self.path).query)
+            raw = (query.get("path") or [""])[0]
+            try:
+                video = Path(raw).expanduser().resolve()
+            except OSError:
+                self._send_json({"error": "视频路径无法解析"}, 400)
+                return
+            if video not in preview_files or not video.is_file() or video.suffix.lower() not in VIDEO_EXTENSIONS:
+                self._send_json({"error": "预览视频不可用"}, 404)
+                return
+            size = video.stat().st_size
+            start, end = 0, size - 1
+            status = 200
+            range_header = self.headers.get("Range", "")
+            if range_header.startswith("bytes="):
+                try:
+                    first, last = range_header[6:].split(",", 1)[0].split("-", 1)
+                    start = int(first) if first else 0
+                    end = int(last) if last else min(size - 1, start + 4 * 1024 * 1024 - 1)
+                    if start < 0 or start >= size or end < start:
+                        raise ValueError
+                    end = min(end, size - 1)
+                    status = 206
+                except ValueError:
+                    self.send_response(416)
+                    self.send_header("Content-Range", f"bytes */{size}")
+                    self.end_headers()
+                    return
+            length = end - start + 1
+            content_type = mimetypes.guess_type(video.name)[0] or "video/mp4"
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Length", str(length))
+            if status == 206:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.end_headers()
+            with video.open("rb") as source:
+                source.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = source.read(min(256 * 1024, remaining))
+                    if not chunk:
+                        break
+                    try:
+                        self.wfile.write(chunk)
+                    except (BrokenPipeError, ConnectionResetError):
+                        break
+                    remaining -= len(chunk)
+
         def do_GET(self) -> None:  # noqa: N802
-            if self.path in ("/", "/index.html"):
+            route = urlparse(self.path).path
+            if route in ("/", "/index.html"):
                 # 每次请求重新读取页面，界面修改无需重启服务
                 try:
                     body = html_path.read_text(encoding="utf-8").encode("utf-8")
@@ -237,7 +344,7 @@ def make_handler(runner: JobRunner, html_path: Path) -> type[BaseHTTPRequestHand
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
-            elif self.path == "/api/status":
+            elif route == "/api/status":
                 self._send_json({
                     "platform": platform_name(),
                     "jianying_running": jianying_running(),
@@ -247,12 +354,16 @@ def make_handler(runner: JobRunner, html_path: Path) -> type[BaseHTTPRequestHand
                     "voices": [{"id": v, "name": n} for v, n in COMMON_VOICES],
                     "ark_configured": bool(config.ai.api_key and config.doubao_tts.api_key),
                 })
-            elif self.path.startswith("/api/browse"):
+            elif route == "/api/browse":
                 self._send_json(self._browse())
-            elif self.path == "/api/jobs":
+            elif route == "/api/library-preview":
+                self._send_json(self._library_preview())
+            elif route == "/api/media-preview":
+                self._send_preview_video()
+            elif route == "/api/jobs":
                 self._send_json(runner.list_jobs())
-            elif self.path.startswith("/api/jobs/"):
-                job_id = self.path.split("/api/jobs/", 1)[1].split("?", 1)[0]
+            elif route.startswith("/api/jobs/"):
+                job_id = route.split("/api/jobs/", 1)[1]
                 job = runner.jobs.get(job_id)
                 if job is None:
                     self._send_json({"error": "任务不存在"}, 404)
@@ -296,7 +407,7 @@ def serve(
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(runner, html_path))
     server.daemon_threads = True
     url = f"http://127.0.0.1:{port}"
-    print(f"autocut 控制台已启动：{url}（Ctrl+C 停止）")
+    print(f"Script to Draft 创作台已启动：{url}（Ctrl+C 停止）")
     if open_browser:
         import webbrowser
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
