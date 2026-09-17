@@ -41,19 +41,31 @@ def browse_roots() -> list[dict[str, str]]:
     return roots
 
 
+def _registry_file(draft_root: Path) -> Path:
+    """剪映 11.x 使用自定义草稿位置时，root_meta_info.json 仍留在默认目录。"""
+    local = draft_root / "root_meta_info.json"
+    if local.is_file():
+        return local
+    fallback = default_draft_root() / "root_meta_info.json"
+    if fallback.is_file():
+        return fallback
+    return local
+
+
 def _executable_candidates() -> list[Path]:
     values: list[Path] = []
     configured = os.environ.get("AUTOCUT_JIANYING_EXE", "").strip()
     if configured:
         values.append(Path(configured))
     local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
+    apps = local / "JianyingPro/Apps"
+    if apps.is_dir():
+        # 版本号子目录里的 exe 才带真实 ProductVersion；根目录的是启动器（1.0.0.000000）。
+        values.extend(sorted(apps.glob("*/JianyingPro.exe"), reverse=True))
     values.extend([
         local / "JianyingPro/Apps/JianyingPro.exe",
         local / "JianyingPro/JianyingPro.exe",
     ])
-    apps = local / "JianyingPro/Apps"
-    if apps.is_dir():
-        values.extend(sorted(apps.glob("*/JianyingPro.exe"), reverse=True))
     for variable in ("PROGRAMFILES", "PROGRAMFILES(X86)"):
         root = os.environ.get(variable, "").strip()
         if root:
@@ -106,6 +118,23 @@ def _wait_until_quit(attempts: int, interval: float) -> bool:
             return True
         time.sleep(interval)
     return False
+
+
+def open_jianying() -> dict[str, Any]:
+    """网页按钮由用户主动触发：经资源管理器启动剪映，进程独立于本服务。"""
+    if jianying_running():
+        return {"ok": True, "method": "already-running", "message": "剪映已经在运行"}
+    executable = find_jianying_executable()
+    if executable is None:
+        return {"ok": False, "method": "open", "message": "没有找到剪映专业版，可在 .env 配置 AUTOCUT_JIANYING_EXE"}
+    local = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
+    launcher = local / "JianyingPro/Apps/JianyingPro.exe"
+    target = launcher if launcher.is_file() else executable
+    try:
+        os.startfile(str(target))
+    except OSError as exc:
+        return {"ok": False, "method": "open", "message": f"启动剪映失败：{exc}"}
+    return {"ok": True, "method": "open", "message": "已启动剪映"}
 
 
 def quit_jianying() -> dict[str, Any]:
@@ -227,7 +256,7 @@ def install(draft_dir: Path, name: str, draft_root: Path, info: dict[str, Any]) 
     if jianying_running():
         raise DraftCompatibilityError("剪映正在运行，请完全退出后重试")
     target = _validate_name(name, draft_root)
-    root_meta = draft_root / "root_meta_info.json"
+    root_meta = _registry_file(draft_root)
     if not root_meta.is_file():
         raise DraftCompatibilityError(f"剪映草稿注册表不存在：{root_meta}")
     root_data = json.loads(root_meta.read_text(encoding="utf-8"))
@@ -266,7 +295,7 @@ def uninstall(name: str, draft_root: Path) -> None:
     if jianying_running():
         raise DraftCompatibilityError("剪映正在运行，请完全退出后重试")
     target = _validate_name(name, draft_root)
-    root_meta = draft_root / "root_meta_info.json"
+    root_meta = _registry_file(draft_root)
     root_data = json.loads(root_meta.read_text(encoding="utf-8"))
     backup = root_meta.with_name(root_meta.name + time.strftime(".%Y%m%d-%H%M%S.bak"))
     shutil.copy2(root_meta, backup)

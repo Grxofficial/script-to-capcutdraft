@@ -55,6 +55,17 @@ def jianying_running() -> bool:
     return bool(process.stdout.strip())
 
 
+def open_jianying() -> dict[str, Any]:
+    """网页按钮由用户主动触发：通过 launchd 打开剪映。"""
+    if jianying_running():
+        return {"ok": True, "method": "already-running", "message": "剪映本来就在运行"}
+    app = Path("/Applications/VideoFusion-macOS.app")
+    if not app.is_dir():
+        return {"ok": False, "method": "open", "message": "没有找到剪映专业版"}
+    subprocess.Popen(["open", "-a", str(app)])
+    return {"ok": True, "method": "open", "message": "已启动剪映"}
+
+
 def quit_jianying() -> dict[str, Any]:
     """用户主动退出剪映：先正常退出，再逐级结束进程。"""
     if not jianying_running():

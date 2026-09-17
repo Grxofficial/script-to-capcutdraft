@@ -47,7 +47,17 @@
   .btn-primary:hover { background: var(--brand-dark); }
   .btn-primary:disabled { background: #d5d7db; cursor: not-allowed; }
   .btn-ghost { background: #eef0f2; color: var(--ink); }
+  .inline-field { display: flex; gap: 8px; }
+  .inline-field select, .inline-field input[type=text] { flex: 1; min-width: 0; }
+  .inline-field .btn-ghost { white-space: nowrap; }
   .btn-ghost:hover { background: #e2e5e8; }
+  .jy-actions { display: flex; gap: 8px; margin: 14px 0 16px; }
+  .jy-actions button { flex: 1; color: #fff; }
+  .btn-run { background: var(--ok); }
+  .btn-run:hover { filter: brightness(.9); }
+  .btn-stop { background: var(--brand); }
+  .btn-stop:hover { background: var(--brand-dark); }
+  .btn-run:disabled, .btn-stop:disabled { background: #d5d7db; cursor: not-allowed; }
   .chip {
     display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px;
     border-radius: 999px; font-size: 13px; font-weight: 600;
@@ -204,10 +214,8 @@
   <header>
     <h1><span class="appmark" aria-hidden="true">⌘</span>script to draft <span class="studio">studio</span></h1>
     <span id="jyChip" class="chip stop"><span class="dot"></span><span id="jyText">剪映状态检测中…</span></span>
-    <button class="btn-ghost" id="quitBtn" onclick="quitJianying()">退出剪映</button>
   </header>
 
-  <section class="intro"><div><div class="eyebrow">YOUR EVERYDAY CREATIVE SPACE</div><h2>让文案，成为画面。</h2><p>输入文案和素材，调用你配置的云端模型完成拆句、配音与镜头匹配。</p></div><span class="workflow-badge">本机生成草稿 · 云端 AI 推理</span></section>
   <div class="workspace">
   <main class="card">
     <div class="section-title"><h3>创建新作品</h3><span class="step">01 / 创作</span></div>
@@ -217,11 +225,17 @@
     <div class="row">
       <div>
         <label for="name">作品名称</label>
-        <input type="text" id="name" placeholder="例如：海边散步-白底">
+        <div class="inline-field">
+          <input type="text" id="name" placeholder="例如：0917-k3f8">
+          <button type="button" class="btn-ghost" onclick="fillRandomName()">随机名</button>
+        </div>
       </div>
       <div>
         <label for="voice">旁白音色</label>
-        <select id="voice"></select>
+        <div class="inline-field">
+          <select id="voice"></select>
+          <button type="button" class="btn-ghost" id="voicePlayBtn" onclick="playVoicePreview()">试听</button>
+        </div>
       </div>
     </div>
 
@@ -238,7 +252,7 @@
     </div>
 
     <div class="actions">
-      <button class="btn-primary" id="goBtn" onclick="startJob()">生成并安装 ↗</button>
+      <button class="btn-primary" id="goBtn" onclick="startJob()">创建草稿</button>
       <span class="hint" id="hint">生成后自动安装到剪映；安装前会要求剪映已退出</span>
     </div>
 
@@ -249,6 +263,10 @@
   <aside class="sidebar"><div class="preview-card"><div class="preview-title"><span>输出预览</span><span>9:16</span></div><div class="frame"><video id="frameVideo" muted loop playsinline preload="metadata"></video><div class="frame-content" id="frameContent"><span class="frame-kicker" id="frameKicker">WHITE CANVAS</span><span class="frame-label" id="frameLabel">纯白画面</span><span class="frame-subtitle" id="frameSubtitle">你的故事，从这里开始</span><span class="frame-tracks" id="frameTracks">旁白 · 原生字幕</span></div></div><div class="preview-note"><span id="previewNote">白底口播 · 画面始终为纯白色</span><span class="preview-source" id="previewSource">旁白和字幕会按句对齐</span></div><div class="specs"><span>1080 × 1920</span><span>30 fps</span><span>原生字幕</span></div></div>
   <div class="card history-card">
     <div class="section-title"><h3>本次任务</h3><span class="step">ACTIVITY</span></div>
+    <div class="jy-actions">
+      <button type="button" class="btn-run" id="openBtn" onclick="openJianying()">▶ 打开剪映</button>
+      <button type="button" class="btn-stop" id="quitBtn" onclick="quitJianying()">■ 退出剪映</button>
+    </div>
     <div id="history"><span class="hint">暂无</span></div>
   </div></aside></div>
   <footer class="footer"><span>用更少的操作，留更多时间给创作。</span><span>Script to Draft · AI 辅助剪映草稿</span></footer>
@@ -406,6 +424,63 @@ async function refreshStatus() {
   } catch (e) { $('jyText').textContent = '服务连接中断'; $('jyChip').className = 'chip run'; }
 }
 
+let voiceAudio = null;
+function resetVoiceBtn() {
+  $('voicePlayBtn').disabled = false;
+  $('voicePlayBtn').textContent = '试听';
+}
+async function playVoicePreview() {
+  const btn = $('voicePlayBtn');
+  const voice = $('voice').value;
+  if (!voice) { alert('请先选择音色'); return; }
+  if (voiceAudio && voiceAudio.dataset.voice === voice) {
+    if (voiceAudio.paused) { voiceAudio.currentTime = 0; voiceAudio.play(); }
+    else { voiceAudio.pause(); resetVoiceBtn(); }
+    return;
+  }
+  if (voiceAudio) { voiceAudio.pause(); }
+  btn.disabled = true;
+  btn.textContent = '加载中…';
+  voiceAudio = new Audio('/api/voice-preview?voice=' + encodeURIComponent(voice));
+  voiceAudio.dataset.voice = voice;
+  voiceAudio.onended = resetVoiceBtn;
+  voiceAudio.onerror = () => { resetVoiceBtn(); alert('试听加载失败，请稍后重试'); };
+  try {
+    await voiceAudio.play();
+    btn.textContent = '播放中…';
+  } catch (e) {
+    resetVoiceBtn();
+    alert('试听失败：' + e.message);
+  }
+}
+
+function fillRandomName() {
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const arr = new Uint32Array(4);
+  crypto.getRandomValues(arr);
+  let rnd = '';
+  for (const n of arr) rnd += chars[n % chars.length];
+  $('name').value = mm + dd + '-' + rnd;
+}
+
+async function openJianying() {
+  const btn = $('openBtn');
+  btn.disabled = true;
+  btn.textContent = '正在启动…';
+  try {
+    const r = await api('/api/open-jianying', { method: 'POST' });
+    $('jyText').textContent = r.message;
+  } catch (e) {
+    $('jyText').textContent = '启动失败：' + e.message;
+  }
+  btn.disabled = false;
+  btn.textContent = '打开剪映';
+  refreshStatus();
+}
+
 async function quitJianying() {
   $('quitBtn').disabled = true;
   $('quitBtn').textContent = '正在退出…';
@@ -456,7 +531,7 @@ async function startJob() {
 
 function resetGoBtn() {
   $('goBtn').disabled = false;
-  $('goBtn').textContent = '生成并安装 ↗';
+  $('goBtn').textContent = '创建草稿';
 }
 
 async function pollJob() {

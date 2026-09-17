@@ -1,5 +1,7 @@
 .venv/
 .env
+# 本机生成的运行配置（含个人草稿路径），模板见 config.example.toml
+config.toml
 .autocut/
 jobs/
 *.sqlite3

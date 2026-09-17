@@ -20,6 +20,7 @@ from .errors import AutocutError
 from .platform_adapter import (
     browse_roots,
     jianying_running,
+    open_jianying,
     platform_name,
     quit_jianying,
     smoke_is_approved,
@@ -31,13 +32,18 @@ from .media import VIDEO_EXTENSIONS
 # 用户已试听选定的常用豆包音色（voice_type -> 展示名）
 COMMON_VOICES = [
     ("zh_female_xiaohe_uranus_bigtts", "小何 2.0（默认）"),
-    ("zh_female_vv_uranus_bigtts", "Vivi 2.0"),
-    ("zh_female_shuangkuaisisi_uranus_bigtts", "爽快思思 2.0"),
-    ("zh_female_linjianvhai_uranus_bigtts", "邻家女孩 2.0"),
-    ("zh_female_tianmeixiaoyuan_uranus_bigtts", "甜美小源 2.0"),
-    ("zh_female_qingxinnvsheng_uranus_bigtts", "清新女声 2.0"),
-    ("zh_female_cancan_uranus_bigtts", "知性灿灿 2.0"),
+    ("zh_male_dayi_uranus_bigtts", "大壹 2.0"),
+    ("zh_male_xionger_uranus_bigtts", "熊二 2.0"),
+    ("zh_male_yizhipiannan_uranus_bigtts", "译制片男 2.0"),
+    ("zh_male_qingshuangnanda_uranus_bigtts", "清爽男大 2.0"),
+    ("zh_male_huolixiaoge_uranus_bigtts", "活力小哥 2.0"),
+    ("zh_female_zhishuaiyingzi_uranus_bigtts", "直率英子 2.0"),
+    ("zh_female_gujie_uranus_bigtts", "顾姐 2.0"),
 ]
+
+# 网页试听用的固定样例文案
+VOICE_SAMPLE_TEXT = "大家好，这是我的声音，先试听一下再决定。"
+VOICE_PREVIEW_DIR = "voice-previews"
 
 
 def _find_preview_video(library: Path) -> Path | None:
@@ -279,6 +285,43 @@ def make_handler(runner: JobRunner, html_path: Path) -> type[BaseHTTPRequestHand
                 "url": "/api/media-preview?path=" + quote(str(video)),
             }
 
+        def _voice_sample(self, speaker: str) -> Path | None:
+            """返回音色试听样例；首次请求时合成并缓存到本机。"""
+            if speaker not in {voice for voice, _ in COMMON_VOICES}:
+                return None
+            cache = config.state_dir / VOICE_PREVIEW_DIR
+            cache.mkdir(parents=True, exist_ok=True)
+            sample = cache / f"{speaker}.wav"
+            if not sample.is_file() or sample.stat().st_size <= 44:
+                from dataclasses import replace
+
+                from .tts import DoubaoTTS
+                tts = DoubaoTTS(
+                    replace(config.doubao_tts, speaker=speaker),
+                    progress=lambda message: None,
+                )
+                tts.synthesize(VOICE_SAMPLE_TEXT, sample)
+            return sample
+
+        def _send_voice_preview(self) -> None:
+            query = parse_qs(urlparse(self.path).query)
+            speaker = (query.get("voice") or [""])[0]
+            sample = self._voice_sample(speaker)
+            if sample is None:
+                self._send_json({"error": "未知音色"}, 404)
+                return
+            size = sample.stat().st_size
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Length", str(size))
+            self.end_headers()
+            with sample.open("rb") as source:
+                while True:
+                    chunk = source.read(256 * 1024)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+
         def _send_preview_video(self) -> None:
             query = parse_qs(urlparse(self.path).query)
             raw = (query.get("path") or [""])[0]
@@ -360,6 +403,8 @@ def make_handler(runner: JobRunner, html_path: Path) -> type[BaseHTTPRequestHand
                 self._send_json(self._library_preview())
             elif route == "/api/media-preview":
                 self._send_preview_video()
+            elif route == "/api/voice-preview":
+                self._send_voice_preview()
             elif route == "/api/jobs":
                 self._send_json(runner.list_jobs())
             elif route.startswith("/api/jobs/"):
@@ -377,6 +422,8 @@ def make_handler(runner: JobRunner, html_path: Path) -> type[BaseHTTPRequestHand
             try:
                 if self.path == "/api/quit-jianying":
                     self._send_json(quit_jianying())
+                elif self.path == "/api/open-jianying":
+                    self._send_json(open_jianying())
                 elif self.path == "/api/jobs":
                     mode = str(payload.get("mode") or "white")
                     job = (

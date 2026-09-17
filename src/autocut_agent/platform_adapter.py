@@ -55,6 +55,10 @@ def quit_jianying() -> dict[str, Any]:
     return _backend().quit_jianying()
 
 
+def open_jianying() -> dict[str, Any]:
+    return _backend().open_jianying()
+
+
 def prepare_draft(
     draft_dir: Path,
     name: str,

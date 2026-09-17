@@ -27,7 +27,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 %LOCALAPPDATA%/JianyingPro/User Data/Projects/com.lveditor.draft
 ```
 
-非标准路径可在 `config.toml` 的 `[draft]` 中使用正斜杠绝对路径覆盖。无法定位剪映 EXE 时，可在 `.env` 增加 `AUTOCUT_JIANYING_EXE=C:/path/to/JianyingPro.exe`。
+非标准路径可在 `config.toml` 的 `[draft]` 中使用正斜杠绝对路径覆盖。剪映 11 在自定义草稿位置下仍把注册表 `root_meta_info.json` 留在默认目录，安装适配会在草稿根目录找不到注册表时自动回退。无法定位剪映 EXE 时，可在 `.env` 增加 `AUTOCUT_JIANYING_EXE=C:/path/to/JianyingPro.exe`。
 
 ## 第一次冒烟
 
